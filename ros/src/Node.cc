@@ -22,6 +22,7 @@ Node::~Node () {
 
 void Node::Init () {
   //static parameters
+  node_handle_.param(name_of_node_+ "/pose_scale", scale_param_, 5.0);
   node_handle_.param(name_of_node_+ "/cam_angle_deg", cam_angle_param_, 15.0);
   cam_angle_param_ = cam_angle_param_*3.14159265359/180.0; // conversion to radians
   node_handle_.param(name_of_node_+ "/publish_pointcloud", publish_pointcloud_param_, true);
@@ -215,9 +216,9 @@ tf2::Transform Node::TransformFromMat (cv::Mat position_mat) {
   //                                    0.0000000, 1.0, 0.0000000,
   //                                   -0.2249511, 0.0, 0.9743701);
 
-  const tf2::Matrix3x3 tf_camera_tilt(cos(cam_angle_param), 0.0, sin(cam_angle_param),
+  const tf2::Matrix3x3 tf_camera_tilt(cos(cam_angle_param_), 0.0, sin(cam_angle_param_),
                                                        0.0, 1.0,                  0.0,
-                                     -sin(cam_angle_param), 0.0, cos(cam_angle_param));
+                                     -sin(cam_angle_param_), 0.0, cos(cam_angle_param_));
 
   const tf2::Matrix3x3 tf_orb_to_ros_aux (0, 0, 1,
                                          -1, 0, 0,
@@ -239,7 +240,8 @@ tf2::Transform Node::TransformFromMat (cv::Mat position_mat) {
 
   //Transform from orb coordinate system to ros coordinate system on map coordinates
   tf_camera_rotation = tf_orb_to_ros*tf_camera_rotation;
-  tf_camera_translation = tf_orb_to_ros*tf_camera_translation;
+  //tf_camera_translation = tf_orb_to_ros*tf_camera_translation;
+  tf_camera_translation = tf_orb_to_ros*(scale_param_*tf_camera_translation);
 
   return tf2::Transform (tf_camera_rotation, tf_camera_translation);
 }
@@ -279,14 +281,18 @@ sensor_msgs::PointCloud2 Node::MapPointsToPointCloud (std::vector<ORB_SLAM2::Map
   float data_array[num_channels];
   for (unsigned int i=0; i<cloud.width; i++) {
     if (map_points.at(i)->nObs >= min_observations_per_point_) {
-      data_array[0] = map_points.at(i)->GetWorldPos().at<float> (2); //x. Do the transformation by just reading at the position of z instead of x
-      data_array[1] = -1.0* map_points.at(i)->GetWorldPos().at<float> (0); //y. Do the transformation by just reading at the position of x instead of y
-      data_array[2] = -1.0* map_points.at(i)->GetWorldPos().at<float> (1); //z. Do the transformation by just reading at the position of y instead of z
+      //data_array[0] = map_points.at(i)->GetWorldPos().at<float> (2); //x. Do the transformation by just reading at the position of z instead of x
+      //data_array[1] = -1.0* map_points.at(i)->GetWorldPos().at<float> (0); //y. Do the transformation by just reading at the position of x instead of y
+      //data_array[2] = -1.0* map_points.at(i)->GetWorldPos().at<float> (1); //z. Do the transformation by just reading at the position of y instead of z
+      data_array[0] = scale_param_*(map_points.at(i)->GetWorldPos().at<float> (2)); //x. Do the transformation by just reading at the position of z instead of x
+      data_array[1] = scale_param_*(-1.0* map_points.at(i)->GetWorldPos().at<float> (0)); //y. Do the transformation by just reading at the position of x instead of y
+      data_array[2] = scale_param_*(-1.0* map_points.at(i)->GetWorldPos().at<float> (1)); //z. Do the transformation by just reading at the position of y instead of z
       //TODO dont hack the transformation but have a central conversion function for MapPointsToPointCloud and TransformFromMat
+
       //data_array[0] = 0.9743701*data_array[0] + 0.2249511*data_array[2];
       //data_array[2] = 0.9743701*data_array[2] - 0.2249511*data_array[0];
-      data_array[0] = cos(cam_angle_param)*data_array[0] + sin(cam_angle_param)*data_array[2];
-      data_array[2] = cos(cam_angle_param)*data_array[2] - sin(cam_angle_param)*data_array[0];
+      data_array[0] = cos(cam_angle_param_)*data_array[0] + sin(cam_angle_param_)*data_array[2];
+      data_array[2] = cos(cam_angle_param_)*data_array[2] - sin(cam_angle_param_)*data_array[0];
 
       memcpy(cloud_data_ptr+(i*cloud.point_step), data_array, num_channels*sizeof(float));
     }
