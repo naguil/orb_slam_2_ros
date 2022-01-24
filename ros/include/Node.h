@@ -108,6 +108,7 @@ class Node
     bool publish_tf_param_;
     bool publish_pose_param_;
     int min_observations_per_point_;
+    double cam_angle_param_;
 };
 
 #endif //ORBSLAM2_ROS_NODE_H_
